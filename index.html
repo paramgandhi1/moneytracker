@@ -617,30 +617,58 @@ const GOAL_KEY = 'goal-target';
 const LOANS_KEY = 'loans';
 const SAVED_KEY = 'savings-saved';
 
+// Uses Claude.ai's persistent storage when available (viewing inside claude.ai).
+// Falls back to the browser's own localStorage when the file is opened directly
+// (downloaded and double-clicked, or opened on mobile outside claude.ai).
+const store = {
+  async get(key) {
+    if (typeof window.storage !== 'undefined') {
+      try {
+        const res = await window.storage.get(key, false);
+        return res ? res.value : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    try {
+      return window.localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  },
+  async set(key, value) {
+    if (typeof window.storage !== 'undefined') {
+      await window.storage.set(key, value, false);
+      return;
+    }
+    window.localStorage.setItem(key, value);
+  }
+};
+
 const fmt = (n) => (n < 0 ? '-₹' + Math.abs(n).toFixed(2) : '₹' + n.toFixed(2));
 
 async function loadData() {
   try {
-    const res = await window.storage.get(STORAGE_KEY, false);
-    entries = res ? JSON.parse(res.value) : [];
+    const val = await store.get(STORAGE_KEY);
+    entries = val ? JSON.parse(val) : [];
   } catch (e) {
     entries = [];
   }
   try {
-    const res = await window.storage.get(GOAL_KEY, false);
-    goalTarget = res ? JSON.parse(res.value) : 2000;
+    const val = await store.get(GOAL_KEY);
+    goalTarget = val ? JSON.parse(val) : 2000;
   } catch (e) {
     goalTarget = 2000;
   }
   try {
-    const res = await window.storage.get(SAVED_KEY, false);
-    savingsSaved = res ? JSON.parse(res.value) : 0;
+    const val = await store.get(SAVED_KEY);
+    savingsSaved = val ? JSON.parse(val) : 0;
   } catch (e) {
     savingsSaved = 0;
   }
   try {
-    const res = await window.storage.get(LOANS_KEY, false);
-    loans = res ? JSON.parse(res.value) : [];
+    const val = await store.get(LOANS_KEY);
+    loans = val ? JSON.parse(val) : [];
   } catch (e) {
     loans = [];
   }
@@ -651,7 +679,7 @@ async function loadData() {
 
 async function saveEntries() {
   try {
-    await window.storage.set(STORAGE_KEY, JSON.stringify(entries), false);
+    await store.set(STORAGE_KEY, JSON.stringify(entries));
   } catch (e) {
     document.getElementById('footerNote').textContent = 'Could not save — your latest change may not persist.';
   }
@@ -659,13 +687,13 @@ async function saveEntries() {
 
 async function saveGoal() {
   try {
-    await window.storage.set(GOAL_KEY, JSON.stringify(goalTarget), false);
+    await store.set(GOAL_KEY, JSON.stringify(goalTarget));
   } catch (e) {}
 }
 
 async function saveLoans() {
   try {
-    await window.storage.set(LOANS_KEY, JSON.stringify(loans), false);
+    await store.set(LOANS_KEY, JSON.stringify(loans));
   } catch (e) {
     document.getElementById('footerNote').textContent = 'Could not save — your latest change may not persist.';
   }
@@ -673,7 +701,7 @@ async function saveLoans() {
 
 async function saveSavings() {
   try {
-    await window.storage.set(SAVED_KEY, JSON.stringify(savingsSaved), false);
+    await store.set(SAVED_KEY, JSON.stringify(savingsSaved));
   } catch (e) {
     document.getElementById('footerNote').textContent = 'Could not save — your latest change may not persist.';
   }
