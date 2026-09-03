@@ -809,12 +809,41 @@ document.getElementById('addLoanBtn').addEventListener('click', async () => {
 });
 
 async function toggleLoanRepaid(id) {
-  loans = loans.map(l => l.id === id ? { ...l, repaid: !l.repaid } : l);
+  const loan = loans.find(l => l.id === id);
+  if (!loan) return;
+
+  if (!loan.repaid) {
+    // Marking as repaid: add the money back as an income entry
+    const repaymentEntryId = Date.now();
+    entries.unshift({
+      id: repaymentEntryId,
+      desc: 'Repaid by ' + loan.name,
+      category: 'Cash inward',
+      amount: loan.amount,
+      kind: 'income',
+      date: new Date().toISOString()
+    });
+    loans = loans.map(l => l.id === id ? { ...l, repaid: true, repaymentEntryId } : l);
+    await saveEntries();
+  } else {
+    // Unmarking: remove the matching repayment entry so it isn't double-counted
+    if (loan.repaymentEntryId) {
+      entries = entries.filter(e => e.id !== loan.repaymentEntryId);
+      await saveEntries();
+    }
+    loans = loans.map(l => l.id === id ? { ...l, repaid: false, repaymentEntryId: null } : l);
+  }
+
   await saveLoans();
   render();
 }
 
 async function deleteLoan(id) {
+  const loan = loans.find(l => l.id === id);
+  if (loan && loan.repaymentEntryId) {
+    entries = entries.filter(e => e.id !== loan.repaymentEntryId);
+    await saveEntries();
+  }
   loans = loans.filter(l => l.id !== id);
   await saveLoans();
   render();
